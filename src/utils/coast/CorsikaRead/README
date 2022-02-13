@@ -1,0 +1,37 @@
+This is an example for a COAST based CORSIKA binary output file 
+reader. It explains in 2 steps, how to use the create an executable
+to read CORSIKA output and convert it to ASCII (CorsikaReader) or 
+ROOT (CorsikaPlotter) file.
+
+The reader is just a simple example which is meant to be modified by the user
+to organize the data as he wants. The name of all the variables are available
+in the code but for futher details, please refer to the COAST doxygen
+documentation which you can generate with a simple "make" in coast/Documentation
+and then you can read it with : firefox coast/Documentation/COASTDocumentation/html/index.html
+
+Step 1:
+-------
+
+Compile COAST libraries by selecting option "d1" in 'coconut' (other options 
+are not important at this stage) and compile CORSIKA a first time.
+
+Step 2:
+-------
+
+If you need it, edit CorsikaReader.cc or CorsikaPlotter.cc to do what you want.
+Makefile is defined to compile both CorsikaPlotter.cc (with ROOT) and a
+simple ASCII output with CorsikaReader.cc by default. If ROOT is not installed
+only CorsikaReader will be compiled. You can compile only one using "make 
+plotter" or "make reader".
+
+-------
+
+The executable file CorsikaPlotter (or CorsikaReader) is created and you 
+can simply use it with :
+CorsikaPlotter DATxxxxxx
+
+
+
+18/12/2020 by T.Pierog
+
+

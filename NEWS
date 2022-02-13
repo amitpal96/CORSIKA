@@ -1,0 +1,32 @@
+NEWS with version CORSIKA 7.74x are
+          Update of bernlohr package to version 1.63 
+          In Subr. BOX2 erroneously for EPOS and SIBYLL the decay length
+          of strange baryons was not calculated, so these particles were
+          transported according to their interaction length. This bug is
+          now eliminated.
+          Bugs in the binning of the longitudinal profile and in counting
+          of neutral particles for upward going showers have been
+          corrected.
+          New monthly SouthPole atmosphere parameters for IceTop (de
+          Ridder) are added.
+          Corrections to optimize MPI usage with CoREAS.
+          Add MWEIC keyword to select one of the weight in MULTITHIN
+          with COASTUSERLIB and possibly keep a normal output.
+          Improve compatibility between MPI and MULTITHIN.
+          Update CONEX to version 7.5 with improved compatibility with
+          CORSIKA (same lambda treatment in QGSJETII), same projectile
+          selection as in CORSIKA for SIBYLL and bug correction for phi
+          direction in preshower interface.
+          Update SIBYLL to version 2.3d with corrections 
+          changing the pi0 production (and thus the number of muons
+          (lower by few %)) and cross-section (change in Xmax
+          smaller by few g/cm2).
+          Change format for longitudinal energy deposit in vertical 
+          option to get correct depth values in the longitudinal profile.
+          This may give problems in connection with some long-file reader.
+          Make the extended mass range for CONEX+EPOS optional to save memory.
+          Add FLUKAINFN and FLUKACERN options to link the FLUKA 2020 packages 
+          provided by INFN and by CERN.
+          Bug Corrections in CERENKOV option and for UPWARD+CURVED combination
+          for vertical showers.
+April 2021

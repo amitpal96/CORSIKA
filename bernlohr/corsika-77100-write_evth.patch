@@ -1,0 +1,285 @@
+--- corsika.F.orig	2020-01-28 16:56:25.876271073 +0100
++++ corsika.F	2020-01-28 18:45:34.616828601 +0100
+@@ -5,10 +5,11 @@
+ #define __DAY__ 01
+ #define __ICDATE__ 20191001 
+ /*                -YYYYMMDD-           */
+ #define __CDATE__ 'OCTOBER    1, 2019'
+ /*                 ----+----+----+---  */
++#define __WRITE_EVTH__ 1
+ 
+ *TITLE : CORSIKA __CVERSION__  __DAY__/__MONTH__/__YEAR__
+ *SVN: $HeadURL: https://devel-ik.fzk.de/svn/mc/corsika/trunk/src/corsika.F $
+ *REV: $Id: corsika.F 7319 2019-10-01 12:14:39Z pierog $
+ *
+@@ -2919,10 +2920,15 @@
+         IF ( FNPRIM ) THEN
+ #endif
+ C  NEGATIVE FIRST INTERACTIN HEIGHT, IF TRACKING STARTS AT ATMOS. MARGIN
+           IF ( TMARGIN ) EVTH(7) = -EVTH(7)
+ 
++#if __WRITE_EVTH__
++C  WRITE EVENT HEADER TO ALL ACTIVE OUTPUT UNITS
++          CALL WRITE_EVTH(0)
++#else
++C >>>> OLD CODE <<<<
+ #if __REMOTECONTROL__ || __DYNSTACK__
+ C  The changes from IACT TELEVT are not in the stack
+           CALL baack_modify_evth(EVTH, SIZEOF(EVTH) )
+ #endif
+ 
+@@ -2952,18 +2958,20 @@
+           WREVTH = .TRUE.
+ #endif
+ #if !__CONEX__
+           CALL TOBUF( EVTH,0 )
+ #endif
++C <<<< END OF OLD CODE >>>>
+ #endif
+ #if __CERENKOV__
+           IF ( MCERFI .NE. 0 ) THEN
+             DO  ICERBUF = 1, NCERBUF
+               CALL TOBUFC( EVTH,0,ICERBUF )
+             ENDDO
+           ENDIF
+ #endif
++#endif
+ #if !__STACKIN__ && !__PRESHOWER__ && !__CONEX__
+         ENDIF
+ #elif __PRESHOWER__
+         ENDIF
+ #endif
+@@ -4620,10 +4628,19 @@
+ C  JUMP HERE IF NO PRESHOWER OCCURED AND STOP WAS DEMANDED
+  2077   CONTINUE
+ #endif
+         EVTE(2) = REAL( ISHOWNO )
+ 
++#if __WRITE_EVTH__
++#if !__INTTEST__ && !__STACKIN__ && !__PRESHOWER__ && !__CONEX__
++C  FOR EM PARTICLES EVTH IS NOT ALWAYS WRITTEN TO BUFFER IN EGS (IF ACTIVE).
++C  IF NO EVENT HEADER WAS WRITTEN FOR THIS EVENT THEN WRITE IT BEFORE EVENT END.
++        IF ( PRMPAR(0) .LE. 3.D0  .AND. FEGS ) THEN
++           CALL WRITE_EVTH(1)
++#endif
++#endif
++
+ #if __REMOTECONTROL__ || __DYNSTACK__
+         CALL baack_modify_evte(EVTE, SIZEOF(EVTE) )
+ #endif
+ 
+ 
+@@ -33788,10 +33805,101 @@
+ 
+       RETURN
+       END
+ #endif
+ 
++#ifdef __WRITE_EVTH__
++*-- Author :    K. BERNLOEHR, MPIK HEIDELBERG   28/01/2020
++C=======================================================================
++
++      SUBROUTINE WRITE_EVTH( IDUPL )
++
++C-----------------------------------------------------------------------
++C  WRITE EVENT HEADER
++C
++C  WRITES THE EVENT HEADER DATA BLOCK TO ALL ACTIVE OUTPUTS,
++C  INCLUDING REGULAR PARTICLE OUTPUT AS WELL AS 'CERFIL' AND 'TELFIL'.
++C
++C  THIS INCLUDES COMMON CODE THAT WAS USED IN THREE PLACES SO FAR:
++C  IN 'AAMAIN' (OTHER THAN PHOTONS/ELECTRONS/POSITRONS) AS WELL AS IN
++C  'ELECTR' AND IN 'PHOTON' WHEN (AND IF) E.M. PRIMARIES INTERACT.
++C  SINCE THERE CAN BE VERY-LOW-ENERGY ELECTRON/POSITRON PRIMARY 
++C  PARTICLES DEFLECTED TOO MUCH OR LOSING TOO MUCH ENERGY FOR ANY
++C  INTERACTION AT ALL, THIS FUNCTION CAN BE CALLED AGAIN FOR GOOD
++C  MEASURE BEFORE WRITING THE EVENT END DATA BLOCK.
++C
++C  ARGUMENTS:
++C     IDUPL - NON-ZERO IF WE NEED TO CHECK IF THIS IS A DUPLICATE CALL
++C-----------------------------------------------------------------------
++
++      IMPLICIT NONE
++
++#define __BUFFSINC__
++#define __RUNPARINC__
++#if __CERENKOV__
++#define __CEREN3INC__
++#endif
++#include "corsika.h"
++
++C  KEEP THE LAST SHOWER LOOP INDEX NUMBER TO CHECK FOR DUPLICATE CALLS
++      INTEGER LASTEV
++      SAVE
++
++C-----------------------------------------------------------------------
++
++C  AVOID WRITING DUPLICATE HEADERS FOR THE SAME EVENT
++      IF ( IDUPL .NE. 0 .AND. ISHW .EQ. LASTEV )
++         RETURN
++      LASTEV = ISHW
++
++#if __REMOTECONTROL__ || __DYNSTACK__
++C  The changes from IACT TELEVT are not in the stack
++          CALL baack_modify_evth(EVTH, SIZEOF(EVTH) )
++#endif
++
++#if __CERENKOV__ && __IACT__
++        CALL TELEVT( EVTH,PRMPAR )
++#endif
++
++#if __REMOTECONTROL__
++          CALL remotecontrol_push_evth(EVTH)
++          CALL remotecontrol_push_initalparticle(PRMPAR)
++#endif
++
++#if __COMPACT__
++        IF ( COMOUT ) THEN
++          IF ( EVTH(2) .LT. 1.5 ) THEN
++            CALL TOBUFS( EVTH,MAXBUF )
++          ELSE
++            CEVTH = 'EVHW'
++            CALL TOBUFS( EVTH,12 )
++          ENDIF
++        ELSE
++          CALL TOBUF( EVTH,0 )
++        ENDIF
++#else
++#if __PARALLEL__
++C  WREVTH SIGNALS THAT EVTH HAS BEEN WRITTEN OUT
++        WREVTH = .TRUE.
++#endif
++#if !__CONEX__
++        CALL TOBUF( EVTH,0 )
++#endif
++#endif
++#if __CERENKOV__
++C  OUTPUT OF EVENTHEADER TO THE CHERENKOV FILE
++        IF ( MCERFI .NE. 0 ) THEN
++          DO  I = 1, NCERBUF
++            CALL TOBUFC( EVTH,0,I )
++          ENDDO
++        ENDIF
++#endif
++
++      RETURN
++      END
++#endif
++
+ *-- Author :    The CORSIKA development group   21/04/1994
+ C=======================================================================
+ 
+       SUBROUTINE TOBUF( A,IFL )
+ 
+@@ -43493,10 +43601,16 @@
+         PRMPAR(8)  = -YYYY(1)
+ #else
+         PRMPAR(7)  = X(1) - XOFF(NOBSLV)
+         PRMPAR(8)  = -Y(1) - YOFF(NOBSLV)
+ #endif
++
++#if __WRITE_EVTH__
++C  WRITE EVENT HEADER AFTER WE CAME TO THE FIRST INTERACTION POINT
++        CALL WRITE_EVTH(0)
++#else
++C >>>> OLD CODE <<<<
+ #if __CERENKOV__ && __IACT__
+         CALL TELEVT( EVTH,PRMPAR )
+ #endif
+ #if __COMPACT__
+         IF ( COMOUT ) THEN
+@@ -43522,30 +43636,11 @@
+           DO  I = 1, NCERBUF
+             CALL TOBUFC( EVTH,0,I )
+           ENDDO
+         ENDIF
+ #endif
+-#if __CERENKOV__ || __AUGCERLONG__
+-        IF ( FDELAY .AND. IDELAY .GT. 0 ) THEN
+-          RUVW = SQRT(RUMEAN*RUMEAN+RVMEAN*RVMEAN+RWMEAN*RWMEAN)
+-          RUMEAN = RUMEAN / RUVW
+-          RVMEAN = RVMEAN / RUVW
+-          RWMEAN = RWMEAN / RUVW
+-          RCTEA = RCTEA / (1.D0*IDELAY)
+-C ... Delayed Cherenkov emission, assuming particle mass, charge, and thinning
+-C ... weight have not changed since the point of delay.
+-          CALL CERENK( RSTEP,RUMEAN,RVMEAN,RWMEAN,REBEG,REEND,
+-     *      RXBEG,RYBEG,RZBEG,RXEND,RYEND,RZEND,RTBEG,RTEND,
+-     *      PRM*1.D-3,1.D0*LELEC,
+-#if __THIN__
+-     *      WT(NP),RCTEA )
+-#else
+-     *      1.D0,RCTEA )
+-#endif
+-          FDELAY = .FALSE.
+-          IDELAY = 0
+-        ENDIF
++C <<<< END OF OLD CODE >>>>
+ #endif
+ #if __CURVED__
+         IF ( .NOT. TMARGIN ) THEN
+           TIM(1) = 0.D0
+         ENDIF
+@@ -43576,10 +43671,32 @@
+         ENDDO
+ #if __CURVED__
+         CURPAR(14) = PRMPAR(14)
+         CURPAR(16) = PRMPAR(16)
+ #endif
++#if __CERENKOV__ || __AUGCERLONG__
++        IF ( FDELAY .AND. IDELAY .GT. 0 ) THEN
++          RUVW = SQRT(RUMEAN*RUMEAN+RVMEAN*RVMEAN+RWMEAN*RWMEAN)
++          RUMEAN = RUMEAN / RUVW
++          RVMEAN = RVMEAN / RUVW
++          RWMEAN = RWMEAN / RUVW
++          RCTEA = RCTEA / (1.D0*IDELAY)
++C ... Delayed Cherenkov emission, assuming particle mass, charge, and thinning
++C ... weight have not changed since the point of delay.
++C ... The thinning weight should actually be 1.0 for the primary particle.
++          CALL CERENK( RSTEP,RUMEAN,RVMEAN,RWMEAN,REBEG,REEND,
++     *      RXBEG,RYBEG,RZBEG,RXEND,RYEND,RZEND,RTBEG,RTEND,
++     *      PRM*1.D-3,1.D0*LELEC,
++#if __THIN__
++     *      WT(NP),RCTEA )
++#else
++     *      1.D0,RCTEA )
++#endif
++          FDELAY = .FALSE.
++          IDELAY = 0
++        ENDIF
++#endif
+ #if __PARALLEL__
+ C  RETURN BEFORE INTERACTION
+         IF ( JCOUNT .GT. 1 ) THEN
+           NP = 0       !RESET PARTICLE INDEX
+           IRCODE = 3
+@@ -46848,10 +46965,16 @@
+         PRMPAR(8)  = -YYYY(1)
+ #else
+         PRMPAR(7)  = X(1) - XOFF(NOBSLV)
+         PRMPAR(8)  = -Y(1) - YOFF(NOBSLV)
+ #endif
++
++#if __WRITE_EVTH__
++C  WRITE EVENT HEADER AFTER WE CAME TO THE FIRST INTERACTION POINT
++        CALL WRITE_EVTH(0)
++#else
++C >>>> OLD CODE <<<<
+ #if __CERENKOV__ && __IACT__
+         CALL TELEVT( EVTH,PRMPAR )
+ #endif
+ #if __COMPACT__
+         IF ( COMOUT ) THEN
+@@ -46877,10 +47000,12 @@
+           DO  I = 1, NCERBUF
+             CALL TOBUFC( EVTH,0,I )
+           ENDDO
+         ENDIF
+ #endif
++C <<<< END OF OLD CODE >>>>
++#endif
+ #if __CURVED__
+         IF ( .NOT. TMARGIN ) THEN
+           TIM(1) = 0.D0
+         ENDIF
+ #else
